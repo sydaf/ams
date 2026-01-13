@@ -1,0 +1,32 @@
+package ui;
+
+import javax.swing.*;
+import java.awt.*;
+
+/*
+ * MainFrame class
+ * Responsible only for USER INTERFACE
+ * Business logic is handled in manager classes
+ */
+public class MainFrame extends JFrame {
+
+    public MainFrame() {
+        setTitle("University Sports Gear Rental Manager");
+        setSize(600, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JLabel title = new JLabel("University Sports Gear Rental Manager", JLabel.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 18));
+
+        JButton btnEquipment = new JButton("Manage Equipment");
+        JButton btnRent = new JButton("Rent Equipment");
+
+        JPanel panel = new JPanel();
+        panel.add(btnEquipment);
+        panel.add(btnRent);
+
+        add(title, BorderLayout.NORTH);
+        add(panel, BorderLayout.CENTER);
+    }
+}

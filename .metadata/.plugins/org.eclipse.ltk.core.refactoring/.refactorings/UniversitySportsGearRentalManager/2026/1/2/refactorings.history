@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename compilation unit &apos;ui.ManageEquipment.java&apos; to &apos;ManageEquipmentFrame.java&apos;&#x0D;&#x0A;- Original project: &apos;UniversitySportsGearRentalManager&apos;&#x0D;&#x0A;- Original element: &apos;ui.ManageEquipment.java&apos;&#x0D;&#x0A;- Renamed element: &apos;ui.ManageEquipmentFrame.java&apos;" description="Rename compilation unit &apos;ManageEquipment.java&apos;" flags="2" id="org.eclipse.jdt.ui.rename.compilationunit" input="/src&lt;ui{ManageEquipment.java" name="ManageEquipmentFrame.java" references="false" stamp="1767704646041" version="1.0"/>
+</session>

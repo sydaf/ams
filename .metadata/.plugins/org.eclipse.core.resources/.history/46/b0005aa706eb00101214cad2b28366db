@@ -1,0 +1,43 @@
+package manager;
+
+import model.Equipment;
+import model.Rental;
+
+import java.util.ArrayList;
+
+/*
+ * RentalManager
+ * Handles rental logic AND rental history
+ */
+public class RentalManager {
+
+    // Stores rental history (no database required)
+    private ArrayList<Rental> rentalHistory = new ArrayList<>();
+
+    public boolean rentEquipment(String userName, Equipment e, int qty) {
+        if (e.getAvailableQty() >= qty) {
+            e.rent(qty);
+
+            // Record rental transaction
+            Rental rental = new Rental(userName, e.getName(), qty);
+            rentalHistory.add(rental);
+
+            return true;
+        }
+        return false;
+    }
+
+    public ArrayList<Rental> getRentalHistory() {
+        return rentalHistory;
+    }
+    
+ 
+    public boolean returnEquipment(Equipment e, int qty) {
+        if (qty <= 0) return false;
+
+        return e.returnItem(qty); // now returns boolean ✅
+    }
+
+
+
+}

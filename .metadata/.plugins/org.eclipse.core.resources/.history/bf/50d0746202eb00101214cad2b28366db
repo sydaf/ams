@@ -1,0 +1,10 @@
+import ui.MainFrame;
+
+/*
+ * Entry point of the application
+ */
+public class MainApp {
+    public static void main(String[] args) {
+        new MainFrame().setVisible(true);
+    }
+}
