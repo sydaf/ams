@@ -1,14 +1,14 @@
 package ui;
 
+import java.awt.BorderLayout;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+
 import manager.EquipmentManager;
 import manager.RentalManager;
 import model.Equipment;
 import model.Student;
-import model.User;
-import ui.MainFrame;
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-import java.awt.*;
 
 /*
  * RentEquipmentFrame
@@ -16,7 +16,6 @@ import java.awt.*;
  * - View equipment list
  * - Rent equipment
  */
-
 public class RentEquipmentFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;
@@ -24,12 +23,14 @@ public class RentEquipmentFrame extends JFrame {
     private EquipmentManager equipmentManager;
     private RentalManager rentalManager;
     private DefaultTableModel tableModel;
-    private String userName;
+    private Student student;
 
+    public RentEquipmentFrame(Student student,
+                              EquipmentManager equipmentManager,
+                              RentalManager rentalManager) {
 
-    public RentEquipmentFrame(String userName, EquipmentManager equipmentManager, RentalManager rentalManager) {
-        this.userName = userName;
-    	this.equipmentManager = equipmentManager;
+        this.student = student;
+        this.equipmentManager = equipmentManager;
         this.rentalManager = rentalManager;
 
         setTitle("Rent Equipment");
@@ -37,7 +38,7 @@ public class RentEquipmentFrame extends JFrame {
         setLocationRelativeTo(null);
 
         // ---------- TABLE ----------
-        String[] columns = {"ID", "Name", "Brand", "Available Qty"};
+        String[] columns = {"ID", "Name", "Category", "Available Qty"};
         tableModel = new DefaultTableModel(columns, 0);
         JTable table = new JTable(tableModel);
 
@@ -48,7 +49,6 @@ public class RentEquipmentFrame extends JFrame {
         // ---------- FORM ----------
         JTextField txtId = new JTextField(5);
         JTextField txtQty = new JTextField(5);
-
         JButton btnRent = new JButton("Rent");
 
         JPanel formPanel = new JPanel();
@@ -74,11 +74,13 @@ public class RentEquipmentFrame extends JFrame {
                     return;
                 }
 
-                boolean success = rentalManager.rentEquipment(userName, equipment, qty);
+                boolean success = rentalManager.rentEquipment(
+                        student.getName(),
+                        equipment,
+                        qty
+                );
 
                 if (success) {
-
-                    // Green check-mark success popup
                     JOptionPane.showMessageDialog(
                             this,
                             "Equipment rented successfully!",
@@ -86,18 +88,15 @@ public class RentEquipmentFrame extends JFrame {
                             JOptionPane.INFORMATION_MESSAGE
                     );
 
-                    // Go back to Student Main Page
-                    User student = new Student("S001", userName);
-
-                    new MainFrame(
+                    // Return to Student Dashboard
+                    new StudentFrame(
                             student,
                             equipmentManager,
                             rentalManager
                     ).setVisible(true);
 
-                    dispose(); // close RentEquipmentFrame
-                }
-                else {
+                    dispose();
+                } else {
                     JOptionPane.showMessageDialog(this,
                             "Not enough quantity available",
                             "Error",
@@ -116,10 +115,8 @@ public class RentEquipmentFrame extends JFrame {
         add(formPanel, BorderLayout.SOUTH);
     }
 
-    // Refresh table to reflect latest data
     private void refreshTable() {
         tableModel.setRowCount(0);
-
         for (Equipment e : equipmentManager.getAllEquipments()) {
             tableModel.addRow(new Object[]{
                     e.getId(),

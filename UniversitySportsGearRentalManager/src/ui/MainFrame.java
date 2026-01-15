@@ -3,6 +3,7 @@ package ui;
 import manager.EquipmentManager;
 import manager.RentalManager;
 import model.User;
+import model.Student;
 import ui.LoginFrame;
 import javax.swing.*;
 import java.awt.*;
@@ -60,8 +61,19 @@ public class MainFrame extends JFrame {
         });
 
         btnRent.addActionListener(e -> {
-            new RentEquipmentFrame(user.getName(),equipmentManager,rentalManager).setVisible(true);
+            if (user instanceof model.Student) {
+                model.Student student = (model.Student) user;
+
+                new RentEquipmentFrame(
+                        student,
+                        equipmentManager,
+                        rentalManager
+                ).setVisible(true);
+
+                dispose(); // optional: close MainFrame
+            }
         });
+
         
         btnHistory.addActionListener(e -> {
             new RentalHistoryFrame(rentalManager).setVisible(true);

@@ -38,6 +38,14 @@ public class RentalManager {
         return e.returnItem(qty); 
     }
 
+    /*
+     * Returns rentals for a specific student
+     */
+    public java.util.List<Rental> getRentalsByStudent(String studentName) {
+        return rentalHistory.stream()
+                .filter(r -> r.getUserName().equals(studentName))
+                .toList();
+    }
 
 
 }

@@ -1,17 +1,31 @@
 package ui;
 
+import java.awt.BorderLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+
 import manager.EquipmentManager;
 import manager.RentalManager;
 import model.Admin;
 import model.Student;
 import model.User;
 
-import javax.swing.*;
-import java.awt.*;
-
 /*
- * LoginFrame - Updated to match AMS specification
- * Basic login modal for authentication
+ * LoginFrame
+ * Basic login modal with Student basic info
  */
 public class LoginFrame extends JFrame {
 
@@ -25,60 +39,93 @@ public class LoginFrame extends JFrame {
         this.rentalManager = rentalManager;
 
         setTitle("AMS - Student Asset Management System");
-        setSize(450, 300);
+        setSize(450, 350);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
 
-        // Main panel with padding
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Title
         JLabel title = new JLabel("Asset Management System", JLabel.CENTER);
         title.setFont(new Font("Arial", Font.BOLD, 18));
         mainPanel.add(title, BorderLayout.NORTH);
 
-        // Form panel
         JPanel formPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.anchor = GridBagConstraints.WEST;
 
-        // Name field
+        // ---------- NAME ----------
         gbc.gridx = 0;
         gbc.gridy = 0;
         formPanel.add(new JLabel("Name:"), gbc);
+
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0;
         JTextField txtName = new JTextField(20);
         formPanel.add(txtName, gbc);
 
-        // Role field
+        // ---------- ROLE ----------
         gbc.gridx = 0;
         gbc.gridy = 1;
         gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0;
         formPanel.add(new JLabel("Role:"), gbc);
+
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0;
         String[] roles = {"Admin", "Student"};
         JComboBox<String> cbRole = new JComboBox<>(roles);
         formPanel.add(cbRole, gbc);
 
+        // ---------- STUDENT CLASS ----------
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        formPanel.add(new JLabel("Class:"), gbc);
+
+        gbc.gridx = 1;
+        JTextField txtClass = new JTextField(20);
+        formPanel.add(txtClass, gbc);
+
+        // ---------- STUDENT YEAR ----------
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        formPanel.add(new JLabel("Year:"), gbc);
+
+        gbc.gridx = 1;
+        JSpinner spYear = new JSpinner(new SpinnerNumberModel(1, 1, 4, 1));
+        formPanel.add(spYear, gbc);
+
         mainPanel.add(formPanel, BorderLayout.CENTER);
 
-        // Login button
         JButton btnLogin = new JButton("Login");
         btnLogin.setFont(new Font("Arial", Font.BOLD, 14));
-        btnLogin.setPreferredSize(new Dimension(100, 35));
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(btnLogin);
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
         add(mainPanel);
+
+        // 🔹 Initially hide student-only fields
+        txtClass.setVisible(false);
+        spYear.setVisible(false);
+
+        ((JLabel) formPanel.getComponent(4)).setVisible(false); // Class label
+        ((JLabel) formPanel.getComponent(6)).setVisible(false); // Year label
+
+        // ---------- ROLE CHANGE LISTENER ----------
+        cbRole.addActionListener(e -> {
+            boolean isStudent = cbRole.getSelectedItem().equals("Student");
+
+            txtClass.setVisible(isStudent);
+            spYear.setVisible(isStudent);
+
+            ((JLabel) formPanel.getComponent(4)).setVisible(isStudent);
+            ((JLabel) formPanel.getComponent(6)).setVisible(isStudent);
+
+            formPanel.revalidate();
+            formPanel.repaint();
+        });
 
         // ---------- LOGIN ACTION ----------
         btnLogin.addActionListener(e -> {
@@ -93,14 +140,25 @@ public class LoginFrame extends JFrame {
                 return;
             }
 
-            // POLYMORPHISM: User reference, different object types
             User user;
+
             if (role.equals("Admin")) {
                 user = new Admin("A001", name);
                 new AdminFrame(user, equipmentManager, rentalManager).setVisible(true);
             } else {
-                user = new Student("S001", name);
-                new StudentFrame(user, equipmentManager, rentalManager).setVisible(true);
+                String studentClass = txtClass.getText().trim();
+                int year = (int) spYear.getValue();
+
+                if (studentClass.isEmpty()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Please enter class",
+                            "Input Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                Student student = new Student("S001", name, studentClass, year);
+                new StudentFrame(student, equipmentManager, rentalManager).setVisible(true);
             }
 
             dispose();
