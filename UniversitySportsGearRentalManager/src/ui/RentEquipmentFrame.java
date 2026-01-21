@@ -47,13 +47,13 @@ public class RentEquipmentFrame extends JFrame {
         JScrollPane scrollPane = new JScrollPane(table);
 
         // ---------- FORM ----------
-        JTextField txtId = new JTextField(5);
+        JTextField txtBarcode = new JTextField(10);
         JTextField txtQty = new JTextField(5);
         JButton btnRent = new JButton("Rent");
 
         JPanel formPanel = new JPanel();
-        formPanel.add(new JLabel("Equipment ID"));
-        formPanel.add(txtId);
+        formPanel.add(new JLabel("Barcode"));
+        formPanel.add(txtBarcode);
         formPanel.add(new JLabel("Quantity"));
         formPanel.add(txtQty);
         formPanel.add(btnRent);
@@ -61,10 +61,10 @@ public class RentEquipmentFrame extends JFrame {
         // ---------- BUTTON ACTION ----------
         btnRent.addActionListener(e -> {
             try {
-                int id = Integer.parseInt(txtId.getText());
+                String barcode = txtBarcode.getText().trim();
                 int qty = Integer.parseInt(txtQty.getText());
 
-                Equipment equipment = equipmentManager.findById(id);
+                Equipment equipment = equipmentManager.findByBarcode(barcode);
 
                 if (equipment == null) {
                     JOptionPane.showMessageDialog(this,
@@ -119,9 +119,9 @@ public class RentEquipmentFrame extends JFrame {
         tableModel.setRowCount(0);
         for (Equipment e : equipmentManager.getAllEquipments()) {
             tableModel.addRow(new Object[]{
-                    e.getId(),
+                    e.getBarcode(),
                     e.getName(),
-                    e.getBrand(),
+                    e.getCategory(),
                     e.getAvailableQty()
             });
         }

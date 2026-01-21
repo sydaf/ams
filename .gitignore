@@ -1,0 +1,6 @@
+# Personal helper scripts
+run-ams.sh
+
+# Compiled Java output
+UniversitySportsGearRentalManager/bin/
+*.class

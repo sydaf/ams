@@ -94,7 +94,7 @@ public class AdminFrame extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         // Table
-        String[] columns = {"ID", "Name", "Brand", "Available Qty", "Total Qty"};
+        String[] columns = {"Barcode", "Name", "Category", "Available Qty", "Total Qty", "Status"};
         equipmentTableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -107,19 +107,19 @@ public class AdminFrame extends JFrame {
 
         // Form panel
         JPanel formPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JTextField txtId = new JTextField(5);
+        JTextField txtBarcode = new JTextField(10);
         JTextField txtName = new JTextField(10);
-        JTextField txtBrand = new JTextField(10);
+        JTextField txtCategory = new JTextField(10);
         JTextField txtQty = new JTextField(5);
 
         JButton btnAdd = new JButton("Add New Item");
 
-        formPanel.add(new JLabel("ID:"));
-        formPanel.add(txtId);
+        formPanel.add(new JLabel("Barcode:"));
+        formPanel.add(txtBarcode);
         formPanel.add(new JLabel("Name:"));
         formPanel.add(txtName);
-        formPanel.add(new JLabel("Brand:"));
-        formPanel.add(txtBrand);
+        formPanel.add(new JLabel("Category:"));
+        formPanel.add(txtCategory);
         formPanel.add(new JLabel("Qty:"));
         formPanel.add(txtQty);
         formPanel.add(btnAdd);
@@ -127,20 +127,27 @@ public class AdminFrame extends JFrame {
         // Add button action
         btnAdd.addActionListener(e -> {
             try {
-                int id = Integer.parseInt(txtId.getText());
+                String barcode = txtBarcode.getText().trim();
                 String name = txtName.getText();
-                String brand = txtBrand.getText();
+                String category = txtCategory.getText();
                 int qty = Integer.parseInt(txtQty.getText());
 
-                Equipment equipment = new Equipment(id, name, brand, qty);
-                equipmentManager.addEquipment(equipment);
+                Equipment equipment = new Equipment(barcode, name, category, qty);
+                boolean added = equipmentManager.addEquipment(equipment);
+                if (!added) {
+                    JOptionPane.showMessageDialog(this,
+                            "Barcode already exists",
+                            "Input Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
 
                 refreshEquipmentTable();
 
                 // Clear input
-                txtId.setText("");
+                txtBarcode.setText("");
                 txtName.setText("");
-                txtBrand.setText("");
+                txtCategory.setText("");
                 txtQty.setText("");
 
                 JOptionPane.showMessageDialog(this,
@@ -166,11 +173,12 @@ public class AdminFrame extends JFrame {
         equipmentTableModel.setRowCount(0);
         for (Equipment e : equipmentManager.getAllEquipments()) {
             equipmentTableModel.addRow(new Object[]{
-                    e.getId(),
+                    e.getBarcode(),
                     e.getName(),
-                    e.getBrand(),
+                    e.getCategory(),
                     e.getAvailableQty(),
-                    e.getTotalQty()
+                    e.getTotalQty(),
+                    e.getStatus().name()
             });
         }
     }

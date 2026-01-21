@@ -15,16 +15,17 @@ public class RentalManager {
     private ArrayList<Rental> rentalHistory = new ArrayList<>();
 
     public boolean rentEquipment(String userName, Equipment e, int qty) {
-        if (e.getAvailableQty() >= qty) {
-            e.rent(qty);
+        if (e == null) return false;
+        if (qty <= 0) return false;
+        if (e.getAvailableQty() < qty) return false;
 
-            // Record rental transaction
-            Rental rental = new Rental(userName, e.getName(), qty);
-            rentalHistory.add(rental);
+        e.rent(qty);
 
-            return true;
-        }
-        return false;
+        // Record rental transaction
+        Rental rental = new Rental(userName, e.getBarcode(), e.getName(), qty);
+        rentalHistory.add(rental);
+
+        return true;
     }
 
     public ArrayList<Rental> getRentalHistory() {

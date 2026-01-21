@@ -88,22 +88,22 @@ public class StudentFrame extends JFrame {
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         JPanel form = new JPanel();
-        JTextField txtId = new JTextField(5);
+        JTextField txtBarcode = new JTextField(10);
         JTextField txtQty = new JTextField(5);
         JButton btnRent = new JButton("Rent");
 
-        form.add(new JLabel("Equipment ID"));
-        form.add(txtId);
+        form.add(new JLabel("Barcode"));
+        form.add(txtBarcode);
         form.add(new JLabel("Quantity"));
         form.add(txtQty);
         form.add(btnRent);
 
         btnRent.addActionListener(e -> {
             try {
-                int id = Integer.parseInt(txtId.getText());
+                String barcode = txtBarcode.getText().trim();
                 int qty = Integer.parseInt(txtQty.getText());
 
-                Equipment eq = equipmentManager.findById(id);
+                Equipment eq = equipmentManager.findByBarcode(barcode);
 
                 if (eq == null) {
                     JOptionPane.showMessageDialog(this,
@@ -128,7 +128,7 @@ public class StudentFrame extends JFrame {
                     refreshAvailableTable();
                     refreshMyRentalsTable();
 
-                    txtId.setText("");
+                    txtBarcode.setText("");
                     txtQty.setText("");
                 } else {
                     JOptionPane.showMessageDialog(this,
@@ -176,9 +176,9 @@ public class StudentFrame extends JFrame {
         for (Equipment e : equipmentManager.getAllEquipments()) {
             if (e.getAvailableQty() > 0) {
                 availableTableModel.addRow(new Object[]{
-                        e.getId(),
+                        e.getBarcode(),
                         e.getName(),
-                        e.getBrand(),   // later change to Category
+                        e.getCategory(),
                         e.getAvailableQty()
                 });
             }

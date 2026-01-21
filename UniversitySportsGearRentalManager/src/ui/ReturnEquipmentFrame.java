@@ -41,7 +41,7 @@ public class ReturnEquipmentFrame extends JFrame {
         setLocationRelativeTo(null);
 
         // ---------- TABLE ----------
-        String[] columns = {"ID", "Name", "Brand", "Available Qty"};
+        String[] columns = {"Barcode", "Name", "Category", "Available Qty"};
         tableModel = new DefaultTableModel(columns, 0);
         JTable table = new JTable(tableModel);
 
@@ -50,13 +50,13 @@ public class ReturnEquipmentFrame extends JFrame {
         JScrollPane scrollPane = new JScrollPane(table);
 
         // ---------- FORM ----------
-        JTextField txtId = new JTextField(5);
+        JTextField txtBarcode = new JTextField(10);
         JTextField txtQty = new JTextField(5);
         JButton btnReturn = new JButton("Return");
 
         JPanel formPanel = new JPanel();
-        formPanel.add(new JLabel("Equipment ID"));
-        formPanel.add(txtId);
+        formPanel.add(new JLabel("Barcode"));
+        formPanel.add(txtBarcode);
         formPanel.add(new JLabel("Quantity"));
         formPanel.add(txtQty);
         formPanel.add(btnReturn);
@@ -64,10 +64,10 @@ public class ReturnEquipmentFrame extends JFrame {
         // ---------- BUTTON ACTION ----------
         btnReturn.addActionListener(e -> {
             try {
-                int id = Integer.parseInt(txtId.getText());
+                String barcode = txtBarcode.getText().trim();
                 int qty = Integer.parseInt(txtQty.getText());
 
-                Equipment equipment = equipmentManager.findById(id);
+                Equipment equipment = equipmentManager.findByBarcode(barcode);
 
                 if (equipment == null) {
                     JOptionPane.showMessageDialog(this,
@@ -111,9 +111,9 @@ public class ReturnEquipmentFrame extends JFrame {
 
         for (Equipment e : equipmentManager.getAllEquipments()) {
             tableModel.addRow(new Object[]{
-                    e.getId(),
+                    e.getBarcode(),
                     e.getName(),
-                    e.getBrand(),
+                    e.getCategory(),
                     e.getAvailableQty()
             });
         }
