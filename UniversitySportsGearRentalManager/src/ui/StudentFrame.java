@@ -39,34 +39,52 @@ public class StudentFrame extends JFrame {
         setSize(900, 600);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
 
-        // ---------- HEADER ----------
-        JPanel header = new JPanel(new GridLayout(2, 2, 10, 5));
-        header.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        // Main container
+        JPanel mainPanel = new JPanel(new BorderLayout());
 
-        header.add(new JLabel("ID: " + student.getUserId()));
-        header.add(new JLabel("Name: " + student.getName()));
-        header.add(new JLabel("Class: " + student.getStudentClass()));
-        header.add(new JLabel("Year: " + student.getYear()));
+        // Top Header - User Profile
+        JPanel headerPanel = createHeaderPanel();
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
 
-        add(header, BorderLayout.NORTH);
-
-        // ---------- TABS ----------
+        // Tabbed Navigation
         JTabbedPane tabs = new JTabbedPane();
         tabs.add("Rent Equipment", createRentPanel());
         tabs.add("My Rentals", createMyRentalsPanel());
 
-        add(tabs, BorderLayout.CENTER);
+        mainPanel.add(tabs, BorderLayout.CENTER);
 
-        // ---------- LOGOUT ----------
-        JButton btnLogout = new JButton("Logout");
+        add(mainPanel);
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 2, 0, Color.GRAY),
+            BorderFactory.createEmptyBorder(15, 20, 15, 20)
+        ));
+        headerPanel.setBackground(new Color(240, 240, 240));
+
+        // Left side - User info
+        JPanel userInfoPanel = new JPanel(new GridLayout(2, 2, 10, 5));
+        userInfoPanel.setOpaque(false);
+        
+        userInfoPanel.add(new JLabel("User ID: " + student.getUserId()));
+        userInfoPanel.add(new JLabel("Name: " + student.getName()));
+        userInfoPanel.add(new JLabel("Class: " + student.getStudentClass()));
+        userInfoPanel.add(new JLabel("Year: " + student.getYear()));
+
+        // Right side - Logout button
+        JButton btnLogout = new JButton("Log out");
         btnLogout.addActionListener(e -> {
             new LoginFrame(equipmentManager, rentalManager).setVisible(true);
             dispose();
         });
 
-        add(btnLogout, BorderLayout.SOUTH);
+        headerPanel.add(userInfoPanel, BorderLayout.WEST);
+        headerPanel.add(btnLogout, BorderLayout.EAST);
+
+        return headerPanel;
     }
 
     // ================= RENT PANEL =================
