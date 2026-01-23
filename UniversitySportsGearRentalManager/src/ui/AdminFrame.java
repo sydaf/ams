@@ -188,7 +188,8 @@ public class AdminFrame extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         // Table
-        String[] columns = {"User", "Equipment", "Quantity", "Date"};
+        String[] columns = {"User", "Equipment", "Quantity", "Rental Date", "Due Date", "Status"};
+//        String[] cols = {"Equipment", "Quantity", "Rental Date", "Due Date", "Status"};
         historyTableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -208,11 +209,14 @@ public class AdminFrame extends JFrame {
         historyTableModel.setRowCount(0);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         for (Rental r : rentalManager.getRentalHistory()) {
+            String statusStr = r.getStatus().toString(); 
             historyTableModel.addRow(new Object[]{
                     r.getUserName(),
                     r.getEquipmentName(),
                     r.getQuantity(),
-                    r.getRentalDate().format(formatter)
+                    r.getRentalDate().format(formatter),
+                    r.getDueDate().format(formatter), // Show when they must return it
+                    statusStr // ACTIVE, LATE, or CLOSED
             });
         }
     }

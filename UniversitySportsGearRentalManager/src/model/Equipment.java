@@ -9,7 +9,10 @@ public class Equipment {
 
     public enum Status {
         AVAILABLE,
-        UNAVAILABLE
+        UNAVAILABLE,
+        ACTIVE,
+        LATE,
+        CLOSED
     }
 
     // Primary identifier (Barcode tracking)

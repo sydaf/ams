@@ -9,6 +9,7 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.format.DateTimeFormatter;
+import model.Rental;
 
 /*
  * StudentFrame
@@ -149,12 +150,13 @@ public class StudentFrame extends JFrame {
         return panel;
     }
 
-    // ================= MY RENTALS PANEL =================
+ // ================= MY RENTALS PANEL =================
     private JPanel createMyRentalsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        String[] cols = {"Equipment", "Quantity", "Rental Date"};
+        // UPDATED: Added columns for Due Date and Status
+        String[] cols = {"Equipment", "Quantity", "Rental Date", "Due Date", "Status"};
         myRentalsTableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -163,6 +165,8 @@ public class StudentFrame extends JFrame {
         };
 
         JTable table = new JTable(myRentalsTableModel);
+        
+        // Optional: Color code the status column could be a next step
         refreshMyRentalsTable();
 
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
@@ -188,15 +192,22 @@ public class StudentFrame extends JFrame {
     private void refreshMyRentalsTable() {
         myRentalsTableModel.setRowCount(0);
 
-        DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+        // We filter by the student's name to show their specific lifecycle
         rentalManager.getRentalHistory().stream()
                 .filter(r -> r.getUserName().equals(student.getName()))
-                .forEach(r -> myRentalsTableModel.addRow(new Object[]{
-                        r.getEquipmentName(),
-                        r.getQuantity(),
-                        r.getRentalDate().format(formatter)
-                }));
+                .forEach(r -> {
+                    // Logic from our Policy Engine
+                    String statusStr = r.getStatus().toString(); 
+                    
+                    myRentalsTableModel.addRow(new Object[]{
+                            r.getEquipmentName(),
+                            r.getQuantity(),
+                            r.getRentalDate().format(formatter),
+                            r.getDueDate().format(formatter), // Show when they must return it
+                            statusStr // ACTIVE, LATE, or CLOSED
+                    });
+                });
     }
 }
