@@ -4,3 +4,14 @@ run-ams.sh
 # Compiled Java output
 UniversitySportsGearRentalManager/bin/
 *.class
+
+# Eclipse workspace
+.metadata/
+
+# Compiled output
+bin/
+*.class
+
+# OS junk
+.DS_Store
+Thumbs.db

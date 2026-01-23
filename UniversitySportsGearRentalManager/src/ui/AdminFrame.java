@@ -12,8 +12,10 @@ import java.awt.*;
 import java.time.format.DateTimeFormatter;
 
 /*
- * AdminFrame - Updated to match AMS specification
- * Admin view with 2 tabs: Manage Items and History/Audit
+ * AdminFrame
+ * Admin dashboard with:
+ * - Manage Items (CRUD via popup)
+ * - History / Audit (read-only)
  */
 public class AdminFrame extends JFrame {
 
@@ -22,11 +24,18 @@ public class AdminFrame extends JFrame {
     private User user;
     private EquipmentManager equipmentManager;
     private RentalManager rentalManager;
-    private JTabbedPane tabbedPane;
+
     private DefaultTableModel equipmentTableModel;
     private DefaultTableModel historyTableModel;
+    private JTable equipmentTable;
+    private JComboBox<String> cbCategoryFilter;
+    private JComboBox<String> cbHistoryCategoryFilter;
 
-    public AdminFrame(User user, EquipmentManager equipmentManager, RentalManager rentalManager) {
+
+    public AdminFrame(User user,
+                      EquipmentManager equipmentManager,
+                      RentalManager rentalManager) {
+
         this.user = user;
         this.equipmentManager = equipmentManager;
         this.rentalManager = rentalManager;
@@ -36,142 +45,460 @@ public class AdminFrame extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // Main container
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        add(createHeaderPanel(), BorderLayout.NORTH);
 
-        // Top Header - User Profile
-        JPanel headerPanel = createHeaderPanel();
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.add("Manage Items", createManageItemsPanel());
+        tabs.add("History / Audit", createHistoryPanel());
 
-        // Tabbed Navigation
-        tabbedPane = new JTabbedPane();
-        
-        // Tab 1: Manage Items
-        JPanel manageItemsPanel = createManageItemsPanel();
-        tabbedPane.addTab("Manage Items", manageItemsPanel);
-
-        // Tab 2: History / Audit
-        JPanel historyPanel = createHistoryPanel();
-        tabbedPane.addTab("History / Audit", historyPanel);
-
-        mainPanel.add(tabbedPane, BorderLayout.CENTER);
-
-        add(mainPanel);
+        add(tabs, BorderLayout.CENTER);
     }
 
+    // ================= HEADER =================
     private JPanel createHeaderPanel() {
-        JPanel headerPanel = new JPanel(new BorderLayout());
-        headerPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 2, 0, Color.GRAY),
-            BorderFactory.createEmptyBorder(15, 20, 15, 20)
-        ));
-        headerPanel.setBackground(new Color(240, 240, 240));
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
 
-        // Left side - User info
-        JPanel userInfoPanel = new JPanel(new GridLayout(2, 2, 10, 5));
-        userInfoPanel.setOpaque(false);
-        
-        userInfoPanel.add(new JLabel("User ID: " + user.getUserId()));
-        userInfoPanel.add(new JLabel("Name: " + user.getName()));
-        userInfoPanel.add(new JLabel("Class: N/A")); // Placeholder for now
-        userInfoPanel.add(new JLabel("Year: N/A")); // Placeholder for now
+        JLabel lblUser = new JLabel("Admin: " + user.getName());
+        JButton btnLogout = new JButton("Logout");
 
-        // Right side - Logout button
-        JButton btnLogout = new JButton("Log out");
         btnLogout.addActionListener(e -> {
             new LoginFrame(equipmentManager, rentalManager).setVisible(true);
             dispose();
         });
 
-        headerPanel.add(userInfoPanel, BorderLayout.WEST);
-        headerPanel.add(btnLogout, BorderLayout.EAST);
+        panel.add(lblUser, BorderLayout.WEST);
+        panel.add(btnLogout, BorderLayout.EAST);
+        return panel;
+    }
+    
+ // ================= EXPORT EQUIPMENT CSV =================
+    private void exportEquipmentToCSV() {
 
-        return headerPanel;
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Save Equipment List");
+        chooser.setSelectedFile(new java.io.File("equipment_list.csv"));
+
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+
+        try (java.io.PrintWriter pw =
+                     new java.io.PrintWriter(chooser.getSelectedFile())) {
+
+            pw.println("Barcode,Name,Category,Available,Total,Status");
+
+            for (Equipment e : equipmentManager.getAllEquipments()) {
+                pw.println(
+                        e.getBarcode() + "," +
+                        e.getName() + "," +
+                        e.getCategory() + "," +
+                        e.getAvailableQty() + "," +
+                        e.getTotalQty() + "," +
+                        e.getStatus()
+                );
+            }
+
+            JOptionPane.showMessageDialog(this,
+                    "Equipment CSV exported successfully");
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Export failed: " + ex.getMessage());
+        }
+    }
+    
+ // ================= EXPORT HISTORY CSV =================
+    private void exportHistoryToCSV() {
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Save Rental History");
+        chooser.setSelectedFile(new java.io.File("rental_history.csv"));
+
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+
+        DateTimeFormatter formatter =
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        try (java.io.PrintWriter pw =
+                     new java.io.PrintWriter(chooser.getSelectedFile())) {
+
+            pw.println("User,Equipment,Quantity,Rental Date,Due Date,Status");
+
+            for (Rental r : rentalManager.getRentalHistory()) {
+                pw.println(
+                        r.getUserName() + "," +
+                        r.getEquipmentName() + "," +
+                        r.getQuantity() + "," +
+                        r.getRentalDate().format(formatter) + "," +
+                        r.getDueDate().format(formatter) + "," +
+                        r.getStatus()
+                );
+            }
+
+            JOptionPane.showMessageDialog(this,
+                    "History CSV exported successfully");
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Export failed: " + ex.getMessage());
+        }
     }
 
+    private void applyCategoryFilter() {
+
+        Object selected = cbCategoryFilter.getSelectedItem();
+
+        // 🔹 Guard clause (IMPORTANT)
+        if (selected == null) {
+            return;
+        }
+
+        String selectedCategory = selected.toString();
+
+        equipmentTableModel.setRowCount(0);
+
+        for (Equipment e : equipmentManager.getAllEquipments()) {
+
+            if (selectedCategory.equals("All Categories") ||
+                e.getCategory().equals(selectedCategory)) {
+
+                equipmentTableModel.addRow(new Object[]{
+                        e.getBarcode(),
+                        e.getName(),
+                        e.getCategory(),
+                        e.getAvailableQty(),
+                        e.getTotalQty(),
+                        e.getStatus().name()
+                });
+            }
+        }
+    }
+
+
+
+
+    // ================= MANAGE ITEMS =================
     private JPanel createManageItemsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        // Table
-        String[] columns = {"Barcode", "Name", "Category", "Available Qty", "Total Qty", "Status"};
-        equipmentTableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        cbCategoryFilter = new JComboBox<>();
+        cbCategoryFilter.addItem("All Categories");
+
+        filterPanel.add(new JLabel("Category:"));
+        filterPanel.add(cbCategoryFilter);
+
+        panel.add(filterPanel, BorderLayout.NORTH);
+        cbCategoryFilter.addActionListener(e -> applyCategoryFilter());
+
+        String[] cols = {"Barcode", "Name", "Category", "Available", "Total", "Status"};
+        equipmentTableModel = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-        JTable table = new JTable(equipmentTableModel);
+
+        equipmentTable = new JTable(equipmentTableModel);
         refreshEquipmentTable();
-        JScrollPane scrollPane = new JScrollPane(table);
 
-        // Form panel
-        JPanel formPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JTextField txtBarcode = new JTextField(10);
-        JTextField txtName = new JTextField(10);
-        JTextField txtCategory = new JTextField(10);
-        JTextField txtQty = new JTextField(5);
+        panel.add(new JScrollPane(equipmentTable), BorderLayout.CENTER);
 
-        JButton btnAdd = new JButton("Add New Item");
+        JButton btnAdd = new JButton("Add Item");
+        JButton btnEdit = new JButton("Edit");
+        JButton btnDelete = new JButton("Delete");
+        JButton btnExport = new JButton("Export CSV");
 
-        formPanel.add(new JLabel("Barcode:"));
-        formPanel.add(txtBarcode);
-        formPanel.add(new JLabel("Name:"));
-        formPanel.add(txtName);
-        formPanel.add(new JLabel("Category:"));
-        formPanel.add(txtCategory);
-        formPanel.add(new JLabel("Qty:"));
-        formPanel.add(txtQty);
-        formPanel.add(btnAdd);
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnAdd);
+        btnPanel.add(btnEdit);
+        btnPanel.add(btnDelete);
+        btnPanel.add(btnExport);
 
-        // Add button action
-        btnAdd.addActionListener(e -> {
+        // ADD
+        btnAdd.addActionListener(e -> showAddItemDialog());
+
+        // EDIT
+        btnEdit.addActionListener(e -> {
+            int row = equipmentTable.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Select an item to edit");
+                return;
+            }
+
+            String barcode = equipmentTableModel.getValueAt(row, 0).toString();
+            Equipment eq = equipmentManager.findByBarcode(barcode);
+            if (eq != null) showEditItemDialog(eq);
+        });
+
+        // DELETE 
+        btnDelete.addActionListener(e -> {
+            int row = equipmentTable.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Select an item to delete");
+                return;
+            }
+
+            String barcode = equipmentTableModel.getValueAt(row, 0).toString();
+            Equipment eq = equipmentManager.findByBarcode(barcode);
+
+            if (eq.getAvailableQty() != eq.getTotalQty()) {
+                JOptionPane.showMessageDialog(this,
+                        "Cannot delete item with active rentals");
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Delete this equipment?",
+                    "Confirm",
+                    JOptionPane.YES_NO_OPTION);
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                equipmentManager.getAllEquipments().remove(eq);
+                refreshEquipmentTable();
+            }
+        });
+        
+        //Export CSV
+        btnExport.addActionListener(e -> exportEquipmentToCSV());
+
+
+        panel.add(btnPanel, BorderLayout.SOUTH);
+        return panel;
+    }
+
+ // ================= ADD POPUP =================
+    private void showAddItemDialog() {
+
+        JDialog d = new JDialog(this, "Add Equipment", true);
+        d.setSize(380, 300);
+        d.setLocationRelativeTo(this);
+
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+
+        JPanel form = new JPanel(new GridLayout(4, 2, 10, 10));
+
+        JTextField txtBarcode = new JTextField();
+        JTextField txtName = new JTextField();
+        JTextField txtQty = new JTextField();
+
+        String[] categories = {
+                "Sports Equipment",
+                "Laboratory Equipment",
+                "Event Equipment",
+                "Multimedia Equipment"
+        };
+        JComboBox<String> cbCategory = new JComboBox<>(categories);
+
+        form.add(new JLabel("Barcode"));
+        form.add(txtBarcode);
+        form.add(new JLabel("Name"));
+        form.add(txtName);
+        form.add(new JLabel("Category"));
+        form.add(cbCategory);
+        form.add(new JLabel("Total Qty"));
+        form.add(txtQty);
+
+        JButton btnSave = new JButton("Save");
+
+        btnSave.addActionListener(e -> {
             try {
                 String barcode = txtBarcode.getText().trim();
-                String name = txtName.getText();
-                String category = txtCategory.getText();
+                String name = txtName.getText().trim();
+                String category = cbCategory.getSelectedItem().toString();
                 int qty = Integer.parseInt(txtQty.getText());
 
-                Equipment equipment = new Equipment(barcode, name, category, qty);
-                boolean added = equipmentManager.addEquipment(equipment);
-                if (!added) {
-                    JOptionPane.showMessageDialog(this,
-                            "Barcode already exists",
-                            "Input Error",
-                            JOptionPane.ERROR_MESSAGE);
+                Equipment eq = new Equipment(barcode, name, category, qty);
+
+                if (!equipmentManager.addEquipment(eq)) {
+                    JOptionPane.showMessageDialog(d,
+                            "Barcode already exists");
                     return;
                 }
 
                 refreshEquipmentTable();
+                d.dispose();
 
-                // Clear input
-                txtBarcode.setText("");
-                txtName.setText("");
-                txtCategory.setText("");
-                txtQty.setText("");
-
-                JOptionPane.showMessageDialog(this,
-                        "Equipment added successfully!",
-                        "Success",
-                        JOptionPane.INFORMATION_MESSAGE);
-
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Please enter valid data",
-                        "Input Error",
-                        JOptionPane.ERROR_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(d, ex.getMessage());
             }
         });
 
-        panel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(formPanel, BorderLayout.SOUTH);
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnSave);
+
+        outer.add(form, BorderLayout.CENTER);
+        outer.add(btnPanel, BorderLayout.SOUTH);
+        d.add(outer);
+
+        d.setVisible(true);
+    }
+
+
+ // ================= EDIT POPUP =================
+    private void showEditItemDialog(Equipment eq) {
+
+        JDialog d = new JDialog(this, "Edit Equipment", true);
+        d.setSize(360, 260);
+        d.setLocationRelativeTo(this);
+
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+
+        JPanel form = new JPanel(new GridLayout(3, 2, 10, 10));
+
+        JTextField txtName = new JTextField(eq.getName());
+        JTextField txtTotal = new JTextField(String.valueOf(eq.getTotalQty()));
+
+        String[] categories = {
+                "Sports Equipment",
+                "Laboratory Equipment",
+                "Event Equipment",
+                "Multimedia Equipment"
+        };
+        JComboBox<String> cbCategory = new JComboBox<>(categories);
+        cbCategory.setSelectedItem(eq.getCategory()); // preselect existing
+
+        form.add(new JLabel("Name"));
+        form.add(txtName);
+        form.add(new JLabel("Category"));
+        form.add(cbCategory);
+        form.add(new JLabel("Total Qty"));
+        form.add(txtTotal);
+
+        JButton btnSave = new JButton("Save");
+
+        btnSave.addActionListener(e -> {
+            try {
+                int newTotal = Integer.parseInt(txtTotal.getText());
+
+                if (newTotal < eq.getAvailableQty()) {
+                    JOptionPane.showMessageDialog(d,
+                            "Total cannot be less than available stock");
+                    return;
+                }
+
+                String category = cbCategory.getSelectedItem().toString();
+
+                eq.updateDetails(
+                        txtName.getText().trim(),
+                        category,
+                        newTotal
+                );
+
+                refreshEquipmentTable();
+                d.dispose();
+
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(d, ex.getMessage());
+            }
+        });
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnSave);
+
+        outer.add(form, BorderLayout.CENTER);
+        outer.add(btnPanel, BorderLayout.SOUTH);
+        d.add(outer);
+
+        d.setVisible(true);
+    }
+
+    private void applyHistoryCategoryFilter() {
+
+        Object selected = cbHistoryCategoryFilter.getSelectedItem();
+
+        // 🔹 Prevent NullPointerException
+        if (selected == null) return;
+
+        String selectedCategory = selected.toString();
+
+        historyTableModel.setRowCount(0);
+
+        DateTimeFormatter fmt =
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        for (Rental r : rentalManager.getRentalHistory()) {
+
+            Equipment eq = equipmentManager.findByBarcode(
+                    r.getEquipmentBarcode()
+            );
+
+            if (eq == null) continue;
+
+            if (selectedCategory.equals("All Categories") ||
+                eq.getCategory().equals(selectedCategory)) {
+
+                historyTableModel.addRow(new Object[]{
+                        r.getUserName(),
+                        r.getEquipmentName(),
+                        r.getQuantity(),
+                        r.getRentalDate().format(fmt),
+                        r.getDueDate().format(fmt),
+                        r.getStatus().name()
+                });
+            }
+        }
+    }
+
+
+ // ================= HISTORY =================
+    private JPanel createHistoryPanel() {
+
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // FILTER PANEL (TOP)
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        cbHistoryCategoryFilter = new JComboBox<>();
+        cbHistoryCategoryFilter.addItem("All Categories");
+
+        filterPanel.add(new JLabel("Category:"));
+        filterPanel.add(cbHistoryCategoryFilter);
+
+        panel.add(filterPanel, BorderLayout.NORTH);
+
+        // TABLE
+        String[] cols = {"User", "Equipment", "Qty", "Rental Date", "Due Date", "Status"};
+        historyTableModel = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(historyTableModel);
+        refreshHistoryTable();
+
+        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // EXPORT BUTTON (BOTTOM)
+        JButton btnExport = new JButton("Export CSV");
+        btnExport.addActionListener(e -> exportHistoryToCSV());
+
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        bottomPanel.add(btnExport);
+
+        panel.add(bottomPanel, BorderLayout.SOUTH);
+
+        // FILTER ACTION
+        cbHistoryCategoryFilter.addActionListener(e -> applyHistoryCategoryFilter());
 
         return panel;
     }
 
+
+    // ================= REFRESH =================
     private void refreshEquipmentTable() {
+
+        // Remember selection
+        Object previousSelection = cbCategoryFilter.getSelectedItem();
+
         equipmentTableModel.setRowCount(0);
+        cbCategoryFilter.removeAllItems();
+
+        cbCategoryFilter.addItem("All Categories");
+
         for (Equipment e : equipmentManager.getAllEquipments()) {
+
+            // Populate table
             equipmentTableModel.addRow(new Object[]{
                     e.getBarcode(),
                     e.getName(),
@@ -180,44 +507,75 @@ public class AdminFrame extends JFrame {
                     e.getTotalQty(),
                     e.getStatus().name()
             });
+
+            // Populate filter 
+            boolean exists = false;
+            for (int i = 0; i < cbCategoryFilter.getItemCount(); i++) {
+                if (cbCategoryFilter.getItemAt(i).equals(e.getCategory())) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                cbCategoryFilter.addItem(e.getCategory());
+            }
+        }
+
+        // Restore selection 
+        if (previousSelection != null) {
+            cbCategoryFilter.setSelectedItem(previousSelection);
         }
     }
 
-    private JPanel createHistoryPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Table
-        String[] columns = {"User", "Equipment", "Quantity", "Rental Date", "Due Date", "Status"};
-//        String[] cols = {"Equipment", "Quantity", "Rental Date", "Due Date", "Status"};
-        historyTableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        JTable table = new JTable(historyTableModel);
-        refreshHistoryTable();
-        JScrollPane scrollPane = new JScrollPane(table);
-
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        return panel;
-    }
 
     private void refreshHistoryTable() {
+
+        Object previousSelection = cbHistoryCategoryFilter.getSelectedItem();
+
         historyTableModel.setRowCount(0);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        cbHistoryCategoryFilter.removeAllItems();
+        cbHistoryCategoryFilter.addItem("All Categories");
+
+        DateTimeFormatter fmt =
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
         for (Rental r : rentalManager.getRentalHistory()) {
-            String statusStr = r.getStatus().toString(); 
+
+            Equipment eq = equipmentManager.findByBarcode(
+                    r.getEquipmentBarcode()
+            );
+            if (eq == null) continue;
+
+            // Add row
             historyTableModel.addRow(new Object[]{
                     r.getUserName(),
                     r.getEquipmentName(),
                     r.getQuantity(),
-                    r.getRentalDate().format(formatter),
-                    r.getDueDate().format(formatter), // Show when they must return it
-                    statusStr // ACTIVE, LATE, or CLOSED
+                    r.getRentalDate().format(fmt),
+                    r.getDueDate().format(fmt),
+                    r.getStatus().name()
             });
+
+            // Populate filter dropdown
+            boolean exists = false;
+            for (int i = 0; i < cbHistoryCategoryFilter.getItemCount(); i++) {
+                if (cbHistoryCategoryFilter.getItemAt(i)
+                        .equals(eq.getCategory())) {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists) {
+                cbHistoryCategoryFilter.addItem(eq.getCategory());
+            }
+        }
+
+        // Restore selection
+        if (previousSelection != null) {
+            cbHistoryCategoryFilter.setSelectedItem(previousSelection);
         }
     }
+
 }

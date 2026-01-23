@@ -71,4 +71,36 @@ public class Equipment {
         }
         return false;
     }
+    
+ // ================= UPDATE (ADMIN EDIT) =================
+    public void updateDetails(String name, String category, int totalQty) {
+
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Name cannot be empty");
+        }
+
+        if (category == null || category.trim().isEmpty()) {
+            throw new IllegalArgumentException("Category cannot be empty");
+        }
+
+        if (totalQty < 0) {
+            throw new IllegalArgumentException("Total quantity cannot be negative");
+        }
+
+        // Prevent breaking stock logic
+        if (totalQty < (this.totalQty - this.availableQty)) {
+            throw new IllegalArgumentException(
+                    "Total quantity cannot be less than currently rented items"
+            );
+        }
+
+        this.name = name.trim();
+        this.category = category.trim();
+
+        // Adjust available quantity safely
+        int rented = this.totalQty - this.availableQty;
+        this.totalQty = totalQty;
+        this.availableQty = totalQty - rented;
+    }
+
 }
