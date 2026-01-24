@@ -7,15 +7,15 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 
 import javax.swing.BorderFactory;
+import java.awt.Color;
+
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JSpinner;
+import javax.swing.JPasswordField;
 import javax.swing.JTextField;
-import javax.swing.SpinnerNumberModel;
 
 import manager.EquipmentManager;
 import manager.RentalManager;
@@ -24,12 +24,22 @@ import model.Student;
 import model.User;
 
 /*
- * LoginFrame
+ * LoginFrame - Syed
  * Basic login modal with Student basic info
  */
 public class LoginFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;
+
+    // Dummy login credentials
+    private static final String ADMIN_USERNAME = "admin";
+    private static final String ADMIN_PASSWORD = "admin123";
+    private static final String STUDENT_USERNAME = "student";
+    private static final String STUDENT_PASSWORD = "student123";
+    
+    // Static student data
+    private static final String DEFAULT_STUDENT_CLASS = "CS101";
+    private static final int DEFAULT_STUDENT_YEAR = 1;
 
     private EquipmentManager equipmentManager;
     private RentalManager rentalManager;
@@ -39,7 +49,7 @@ public class LoginFrame extends JFrame {
         this.rentalManager = rentalManager;
 
         setTitle("AMS - Student Asset Management System");
-        setSize(450, 350);
+        setSize(450, 300);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
@@ -66,35 +76,25 @@ public class LoginFrame extends JFrame {
         JTextField txtName = new JTextField(20);
         formPanel.add(txtName, gbc);
 
-        // ---------- ROLE ----------
+        // ---------- PASSWORD ----------
         gbc.gridx = 0;
         gbc.gridy = 1;
         gbc.fill = GridBagConstraints.NONE;
-        formPanel.add(new JLabel("Role:"), gbc);
+        formPanel.add(new JLabel("Password:"), gbc);
 
         gbc.gridx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        String[] roles = {"Admin", "Student"};
-        JComboBox<String> cbRole = new JComboBox<>(roles);
-        formPanel.add(cbRole, gbc);
+        JPasswordField txtPassword = new JPasswordField(20);
+        formPanel.add(txtPassword, gbc);
 
-        // ---------- STUDENT CLASS ----------
-        gbc.gridx = 0;
+        // ---------- ERROR LABEL ----------
+        gbc.gridx = 1;
         gbc.gridy = 2;
-        formPanel.add(new JLabel("Class:"), gbc);
-
-        gbc.gridx = 1;
-        JTextField txtClass = new JTextField(20);
-        formPanel.add(txtClass, gbc);
-
-        // ---------- STUDENT YEAR ----------
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        formPanel.add(new JLabel("Year:"), gbc);
-
-        gbc.gridx = 1;
-        JSpinner spYear = new JSpinner(new SpinnerNumberModel(1, 1, 4, 1));
-        formPanel.add(spYear, gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        JLabel lblError = new JLabel("invalid credential");
+        lblError.setForeground(Color.RED);
+        lblError.setVisible(false);
+        formPanel.add(lblError, gbc);
 
         mainPanel.add(formPanel, BorderLayout.CENTER);
 
@@ -106,31 +106,13 @@ public class LoginFrame extends JFrame {
 
         add(mainPanel);
 
-        // 🔹 Initially hide student-only fields
-        txtClass.setVisible(false);
-        spYear.setVisible(false);
-
-        ((JLabel) formPanel.getComponent(4)).setVisible(false); // Class label
-        ((JLabel) formPanel.getComponent(6)).setVisible(false); // Year label
-
-        // ---------- ROLE CHANGE LISTENER ----------
-        cbRole.addActionListener(e -> {
-            boolean isStudent = cbRole.getSelectedItem().equals("Student");
-
-            txtClass.setVisible(isStudent);
-            spYear.setVisible(isStudent);
-
-            ((JLabel) formPanel.getComponent(4)).setVisible(isStudent);
-            ((JLabel) formPanel.getComponent(6)).setVisible(isStudent);
-
-            formPanel.revalidate();
-            formPanel.repaint();
-        });
-
         // ---------- LOGIN ACTION ----------
         btnLogin.addActionListener(e -> {
+            // Hide error label initially
+            lblError.setVisible(false);
+
             String name = txtName.getText().trim();
-            String role = cbRole.getSelectedItem().toString();
+            String password = new String(txtPassword.getPassword());
 
             if (name.isEmpty()) {
                 JOptionPane.showMessageDialog(this,
@@ -140,24 +122,44 @@ public class LoginFrame extends JFrame {
                 return;
             }
 
+            if (password.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "Please enter your password",
+                        "Input Error",
+                        JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Auto-detect role based on credentials
+            String role = null;
+            boolean isValid = false;
+
+            // Try admin credentials first
+            if (name.equals(ADMIN_USERNAME) && password.equals(ADMIN_PASSWORD)) {
+                role = "Admin";
+                isValid = true;
+            }
+            // Try student credentials
+            else if (name.equals(STUDENT_USERNAME) && password.equals(STUDENT_PASSWORD)) {
+                role = "Student";
+                isValid = true;
+            }
+
+            if (!isValid) {
+                lblError.setVisible(true);
+                formPanel.revalidate();
+                formPanel.repaint();
+                return;
+            }
+
             User user;
 
             if (role.equals("Admin")) {
                 user = new Admin("A001", name);
                 new AdminFrame(user, equipmentManager, rentalManager).setVisible(true);
             } else {
-                String studentClass = txtClass.getText().trim();
-                int year = (int) spYear.getValue();
-
-                if (studentClass.isEmpty()) {
-                    JOptionPane.showMessageDialog(this,
-                            "Please enter class",
-                            "Input Error",
-                            JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-
-                Student student = new Student("S001", name, studentClass, year);
+                // Use static data for student class and year
+                Student student = new Student("S001", name, DEFAULT_STUDENT_CLASS, DEFAULT_STUDENT_YEAR);
                 new StudentFrame(student, equipmentManager, rentalManager).setVisible(true);
             }
 
