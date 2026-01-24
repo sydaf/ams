@@ -8,6 +8,7 @@ import model.Student;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import model.Rental;
 
@@ -27,35 +28,66 @@ public class StudentFrame extends JFrame {
 
     private DefaultTableModel availableTableModel;
     private DefaultTableModel myRentalsTableModel;
+    private static boolean itemOverdue;
+    private JPanel alertPanel; 
 
-    public StudentFrame(Student student,
-                        EquipmentManager equipmentManager,
-                        RentalManager rentalManager) {
+    public StudentFrame(Student student, 
+            EquipmentManager equipmentManager, 
+            RentalManager rentalManager) {
 
-        this.student = student;
-        this.equipmentManager = equipmentManager;
-        this.rentalManager = rentalManager;
-
-        setTitle("Student Dashboard");
-        setSize(900, 600);
-        setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        // Main container
-        JPanel mainPanel = new JPanel(new BorderLayout());
-
-        // Top Header - User Profile
-        JPanel headerPanel = createHeaderPanel();
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
-
-        // Tabbed Navigation
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.add("Rent Equipment", createRentPanel());
-        tabs.add("My Rentals", createMyRentalsPanel());
-
-        mainPanel.add(tabs, BorderLayout.CENTER);
-
-        add(mainPanel);
+		this.student = student;
+		this.equipmentManager = equipmentManager;
+		this.rentalManager = rentalManager;
+		
+		setTitle("Student Dashboard");
+		setSize(900, 600);
+		setLocationRelativeTo(null);
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		
+		JPanel mainPanel = new JPanel(new BorderLayout());
+		
+		// Create the container for the top section
+		JPanel topContainer = new JPanel(new BorderLayout());
+		
+		// Initialize Alert Panel (Hidden by default)
+		 alertPanel = createAlertPanel();
+		alertPanel.setVisible(false); 
+		
+		// Add Alert and Header to the container
+		topContainer.add(alertPanel, BorderLayout.NORTH);
+		topContainer.add(createHeaderPanel(), BorderLayout.CENTER);
+		
+		// Put the whole container at the top of the main panel
+		mainPanel.add(topContainer, BorderLayout.NORTH);
+		
+		JTabbedPane tabs = new JTabbedPane();
+		tabs.add("Rent Equipment", createRentPanel());
+		tabs.add("My Rentals", createMyRentalsPanel());
+		mainPanel.add(tabs, BorderLayout.CENTER);
+		
+		add(mainPanel);
+		
+		// Run the first refresh to check if the alert should show up immediately
+		refreshMyRentalsTable();
+		}
+    
+    public void initAutoRefresh() {
+        // 60,000 milliseconds = 1 minute
+        Timer timer = new Timer(20000, e -> refreshMyRentalsTable());
+        timer.start();
+    }
+    
+    private JPanel createAlertPanel() {
+        JPanel alertPanel = new JPanel();
+        alertPanel.setBackground(new Color(255, 230, 230));  
+        alertPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.RED));
+        
+        JLabel alertLabel = new JLabel("⚠️ ATTENTION: You have items overdue, please return promptly or disciplinary actions will be taken");
+        alertLabel.setForeground(Color.RED);
+        alertLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
+        
+        alertPanel.add(alertLabel);
+        return alertPanel;
     }
 
     private JPanel createHeaderPanel() {
@@ -85,6 +117,7 @@ public class StudentFrame extends JFrame {
         headerPanel.add(userInfoPanel, BorderLayout.WEST);
         headerPanel.add(btnLogout, BorderLayout.EAST);
 
+        
         return headerPanel;
     }
 
@@ -183,10 +216,22 @@ public class StudentFrame extends JFrame {
         };
 
         JTable table = new JTable(myRentalsTableModel);
-        
-        refreshMyRentalsTable();
 
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+	     // 1. Apply the color logic to the Status (6) columns
+	     RentalStatusRenderer renderer = new RentalStatusRenderer(); 
+	     table.getColumnModel().getColumn(6).setCellRenderer(renderer);
+	
+	     // 2. Initial data load
+	     refreshMyRentalsTable();
+	
+	     // 3. Set up Auto-Refresh (every 20 seconds)
+	     // This ensures that if a deadline passes while the app is open, it turns red.
+	     javax.swing.Timer autoRefreshTimer = new javax.swing.Timer(20000, e -> {
+	         refreshMyRentalsTable();
+	     });
+	     autoRefreshTimer.start();
+	
+	     panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
         // ---------- RETURN FORM ----------
         JPanel formPanel = new JPanel();
@@ -294,29 +339,53 @@ public class StudentFrame extends JFrame {
 
     private void refreshMyRentalsTable() {
         myRentalsTableModel.setRowCount(0);
-
+        
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        LocalDateTime now = LocalDateTime.now();
+         
+        boolean foundOverdue = false;
 
-        // We filter by the student's name to show their specific lifecycle
-        rentalManager.getRentalHistory().stream()
-                .filter(r -> r.getUserName().equals(student.getName()))
-                .forEach(r -> {
-                    // Logic from our Policy Engine
-                    String statusStr = r.getStatus().toString();
-                    
-                    // Get equipment to retrieve category
-                    Equipment equipment = equipmentManager.findByBarcode(r.getEquipmentBarcode());
-                    String category = equipment != null ? equipment.getCategory() : "N/A";
-                    
-                    myRentalsTableModel.addRow(new Object[]{
-                            r.getEquipmentBarcode(), // ID
-                            r.getEquipmentName(),     // Name
-                            category,                 // Category
-                            r.getQuantity(),          // Quantity
-                            r.getRentalDate().format(formatter), // Rental Date
-                            r.getDueDate().format(formatter),    // Due Date
-                            statusStr                // Status (ACTIVE, LATE, or CLOSED)
-                    });
+        for (Rental r : rentalManager.getRentalHistory()) {
+            if (r.getUserName().equals(student.getName())) {
+                
+                // 1. Determine Late Status
+                // Check if status is explicitly LATE or if the clock has passed the due date
+                boolean isLate = (r.getStatus().toString().equals("LATE") || now.isAfter(r.getDueDate())) 
+                                 && !r.getStatus().toString().equals("CLOSED");
+                
+                if (isLate) {
+                    foundOverdue = true;
+                }
+
+                // 2. Prepare Row Data
+                Equipment equipment = equipmentManager.findByBarcode(r.getEquipmentBarcode());
+                String category = (equipment != null) ? equipment.getCategory() : "N/A";
+                
+                myRentalsTableModel.addRow(new Object[]{
+                        r.getEquipmentBarcode(),
+                        r.getEquipmentName(),
+                        category,
+                        r.getQuantity(),
+                        r.getRentalDate().format(formatter),
+                        r.getDueDate().format(formatter),
+                        r.getStatus().toString()
                 });
+            }
+        }
+
+        // 3. Update the UI State
+        itemOverdue = foundOverdue;
+        
+        // Only trigger layout changes if the visibility actually needs to flip
+        if (alertPanel.isVisible() != itemOverdue) {
+            alertPanel.setVisible(itemOverdue);
+            
+            // This forces the "topContainer" to recalculate sizes 
+            // so the header panel moves down to make room for the alert
+            if (alertPanel.getParent() != null) {
+                alertPanel.getParent().revalidate();
+                alertPanel.getParent().repaint();
+            }
+        }
     }
 }

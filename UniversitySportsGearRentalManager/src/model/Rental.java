@@ -23,7 +23,7 @@ public class Rental {
         this.equipmentName = equipmentName;
         this.quantity = quantity;
         this.rentalDate = LocalDateTime.now(); 
-        this.dueDate = this.rentalDate.plusDays(3);
+        this.dueDate = this.rentalDate.plusSeconds(15);
         this.isReturned = false;
     }
 

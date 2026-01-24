@@ -465,7 +465,15 @@ public class AdminFrame extends JFrame {
         };
 
         JTable table = new JTable(historyTableModel);
+	    RentalStatusRenderer renderer = new RentalStatusRenderer(); 
+	    table.getColumnModel().getColumn(5).setCellRenderer(renderer);
+	     
         refreshHistoryTable();
+    	 
+	     javax.swing.Timer autoRefreshTimer = new javax.swing.Timer(20000, e -> {
+	    	 refreshHistoryTable();
+	     });
+	     autoRefreshTimer.start(); 
 
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
