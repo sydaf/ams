@@ -174,7 +174,7 @@ public class StudentFrame extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // UPDATED: Added columns for Due Date and Status
-        String[] cols = {"Equipment", "Quantity", "Rental Date", "Due Date", "Status"};
+        String[] cols = {"ID", "Name", "Category", "Quantity", "Rental Date", "Due Date", "Status"};
         myRentalsTableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -184,10 +184,95 @@ public class StudentFrame extends JFrame {
 
         JTable table = new JTable(myRentalsTableModel);
         
-        // Optional: Color code the status column could be a next step
         refreshMyRentalsTable();
 
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // ---------- RETURN FORM ----------
+        JPanel formPanel = new JPanel();
+        JTextField txtBarcode = new JTextField(10);
+        JTextField txtQty = new JTextField(5);
+        JButton btnReturn = new JButton("Return");
+
+        formPanel.add(new JLabel("Barcode"));
+        formPanel.add(txtBarcode);
+        formPanel.add(new JLabel("Quantity"));
+        formPanel.add(txtQty);
+        formPanel.add(btnReturn);
+
+        // ---------- BUTTON ACTION ----------
+        btnReturn.addActionListener(e -> {
+            try {
+                String barcode = txtBarcode.getText().trim();
+                int qty = Integer.parseInt(txtQty.getText());
+
+                Equipment equipment = equipmentManager.findByBarcode(barcode);
+
+                if (equipment == null) {
+                    JOptionPane.showMessageDialog(this,
+                            "Equipment not found",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                Rental activeRental = null;
+                for (Rental r : rentalManager.getRentalHistory()) {
+                    if (r.getUserName().equals(student.getName()) &&
+                        r.getEquipmentBarcode().equals(barcode) &&
+                        !r.isReturned()) {
+                        activeRental = r;
+                        break;
+                    }
+                }
+
+                if (activeRental == null) {
+                    JOptionPane.showMessageDialog(this,
+                            "No active rental found for this equipment",
+                            "Return Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (qty > activeRental.getQuantity()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Cannot return more than rented. You rented " + 
+                            activeRental.getQuantity() + " item(s).",
+                            "Return Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                boolean success = rentalManager.returnEquipment(equipment, qty);
+
+                if (success) {
+                    JOptionPane.showMessageDialog(this,
+                            "Equipment returned successfully",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+
+                    refreshMyRentalsTable();
+                    refreshAvailableTable();
+
+                    txtBarcode.setText("");
+                    txtQty.setText("");
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Return failed. Please check the barcode and quantity.",
+                            "Return Error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Please enter valid numbers",
+                        "Input Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        panel.add(formPanel, BorderLayout.SOUTH);
+        
         return panel;
     }
 
@@ -217,14 +302,20 @@ public class StudentFrame extends JFrame {
                 .filter(r -> r.getUserName().equals(student.getName()))
                 .forEach(r -> {
                     // Logic from our Policy Engine
-                    String statusStr = r.getStatus().toString(); 
+                    String statusStr = r.getStatus().toString();
+                    
+                    // Get equipment to retrieve category
+                    Equipment equipment = equipmentManager.findByBarcode(r.getEquipmentBarcode());
+                    String category = equipment != null ? equipment.getCategory() : "N/A";
                     
                     myRentalsTableModel.addRow(new Object[]{
-                            r.getEquipmentName(),
-                            r.getQuantity(),
-                            r.getRentalDate().format(formatter),
-                            r.getDueDate().format(formatter), // Show when they must return it
-                            statusStr // ACTIVE, LATE, or CLOSED
+                            r.getEquipmentBarcode(), // ID
+                            r.getEquipmentName(),     // Name
+                            category,                 // Category
+                            r.getQuantity(),          // Quantity
+                            r.getRentalDate().format(formatter), // Rental Date
+                            r.getDueDate().format(formatter),    // Due Date
+                            statusStr                // Status (ACTIVE, LATE, or CLOSED)
                     });
                 });
     }
