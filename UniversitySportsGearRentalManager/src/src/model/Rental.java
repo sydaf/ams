@@ -13,6 +13,7 @@ public class Rental {
     private String equipmentBarcode;
     private String equipmentName;
     private int quantity;
+    private int processedReturnQty = 0; // Amount brought back so far
     private LocalDateTime rentalDate; 
     private LocalDateTime dueDate;
     private boolean isReturned;
@@ -26,16 +27,15 @@ public class Rental {
         this.dueDate = this.rentalDate.plusSeconds(15);
         this.isReturned = false;
     }
-
+ 
     public Equipment.Status getStatus() {
-        if (isReturned) {
+        if (processedReturnQty >= quantity) {
             return Equipment.Status.CLOSED;
         }
-         
+        
         if (LocalDateTime.now().isAfter(dueDate)) {
             return Equipment.Status.LATE;
         }
-        
         return Equipment.Status.ACTIVE;
     }
 
@@ -44,10 +44,29 @@ public class Rental {
     } 
     
     public String getUserName() { return userName; }
+    
     public String getEquipmentBarcode() { return equipmentBarcode; }
+    
     public String getEquipmentName() { return equipmentName; }
+    
     public int getQuantity() { return quantity; }
+    
+    public void addReturnedQty(int qty) {
+        this.processedReturnQty += qty;
+    }
+
+    public int getRemainingQty() {
+        return this.quantity - this.processedReturnQty;
+    }
+    
     public LocalDateTime getRentalDate() { return rentalDate; }
+    
     public LocalDateTime getDueDate() { return dueDate; }
+    
     public boolean isReturned() { return isReturned; } 
+
+    // Helper for the loop logic
+    public boolean isFullyReturned() {
+        return processedReturnQty >= quantity;
+    }
 }
