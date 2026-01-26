@@ -32,7 +32,7 @@ public class RentalManager {
         return rentalHistory;
     }
 
-    /**
+    /*
      * Updated returnEquipment:
      * Now finds the correct Rental record to close the lifecycle status.
      */
@@ -51,7 +51,7 @@ public class RentalManager {
         return false;
     }
 
-    /**
+    /*
      * Policy Engine Check:
      * Returns a list of all rentals that are currently LATE.
      */

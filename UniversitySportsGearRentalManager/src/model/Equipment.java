@@ -97,7 +97,7 @@ public class Equipment {
         this.name = name.trim();
         this.category = category.trim();
 
-        // Adjust available quantity safely
+
         int rented = this.totalQty - this.availableQty;
         this.totalQty = totalQty;
         this.availableQty = totalQty - rented;

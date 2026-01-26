@@ -163,7 +163,7 @@ public class AdminFrame extends JFrame {
 
         Object selected = cbCategoryFilter.getSelectedItem();
 
-        // 🔹 Guard clause (IMPORTANT)
+        // Guard clause (IMPORTANT)
         if (selected == null) {
             return;
         }
@@ -373,7 +373,7 @@ public class AdminFrame extends JFrame {
                 "Multimedia Equipment"
         };
         JComboBox<String> cbCategory = new JComboBox<>(categories);
-        cbCategory.setSelectedItem(eq.getCategory()); // preselect existing
+        cbCategory.setSelectedItem(eq.getCategory()); 
 
         form.add(new JLabel("Name"));
         form.add(txtName);
