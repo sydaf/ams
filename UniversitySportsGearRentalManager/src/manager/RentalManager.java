@@ -38,22 +38,17 @@ public class RentalManager {
      */
     public boolean returnEquipment(Equipment e, int qty) {
         if (qty <= 0 || e == null) return false;
-
-        // 1. Find the matching active/late rental in history
+        
         for (Rental r : rentalHistory) {
-            // Match barcode AND make sure it's not already CLOSED
             if (r.getEquipmentBarcode().equals(e.getBarcode()) &&
-                !r.isReturned()) {
+                !r.isFullyReturned()) {
                 
-                // 2. Update the physical stock
-                e.returnItem(qty);
-                
-                // 3. Update the rental status to CLOSED
-                r.markAsReturned();
+                e.returnItem(qty); // Update physical stock
+                r.addReturnedQty(qty); // Update specific transaction
                 return true;
             }
         }
-        return false; // No matching active rental found
+        return false;
     }
 
     /**

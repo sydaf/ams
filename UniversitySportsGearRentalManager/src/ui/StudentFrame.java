@@ -73,7 +73,7 @@ public class StudentFrame extends JFrame {
     
     public void initAutoRefresh() {
         // 60,000 milliseconds = 1 minute
-        Timer timer = new Timer(20000, e -> refreshMyRentalsTable());
+        Timer timer = new Timer(1000, e -> refreshMyRentalsTable());
         timer.start();
     }
     
@@ -126,7 +126,7 @@ public class StudentFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        String[] cols = {"ID", "Name", "Category", "Available"};
+        String[] cols = {"Barcode (ID)", "Name", "Category", "Availability"};
         availableTableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -207,7 +207,7 @@ public class StudentFrame extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // UPDATED: Added columns for Due Date and Status
-        String[] cols = {"ID", "Name", "Category", "Quantity", "Rental Date", "Due Date", "Status"};
+        String[] cols = {"Barcode (ID)", "Name", "Category", "Qty", "Pending Qty", "Rented Date", "Return Date", "Due In", "Status"};      
         myRentalsTableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -217,16 +217,16 @@ public class StudentFrame extends JFrame {
 
         JTable table = new JTable(myRentalsTableModel);
 
-	     // 1. Apply the color logic to the Status (6) columns
-	     RentalStatusRenderer renderer = new RentalStatusRenderer(); 
-	     table.getColumnModel().getColumn(6).setCellRenderer(renderer);
+        RentalStatusRenderer myRenderer = new RentalStatusRenderer();
+	     // Apply to the whole table so colors look consistent across the row
+	     table.setDefaultRenderer(Object.class, myRenderer);
 	
 	     // 2. Initial data load
 	     refreshMyRentalsTable();
 	
 	     // 3. Set up Auto-Refresh (every 20 seconds)
 	     // This ensures that if a deadline passes while the app is open, it turns red.
-	     javax.swing.Timer autoRefreshTimer = new javax.swing.Timer(20000, e -> {
+	     javax.swing.Timer autoRefreshTimer = new javax.swing.Timer(1000, e -> {
 	         refreshMyRentalsTable();
 	     });
 	     autoRefreshTimer.start();
@@ -261,32 +261,31 @@ public class StudentFrame extends JFrame {
                     return;
                 }
 
+             // Inside your btnReturn listener:
                 Rental activeRental = null;
                 for (Rental r : rentalManager.getRentalHistory()) {
                     if (r.getUserName().equals(student.getName()) &&
                         r.getEquipmentBarcode().equals(barcode) &&
-                        !r.isReturned()) {
+                        !r.isFullyReturned()) { // Change this
                         activeRental = r;
                         break;
                     }
                 }
 
                 if (activeRental == null) {
+                    JOptionPane.showMessageDialog(this, "No active/partial rental found.");
+                    return;
+                }
+
+                // Check against REMAINING quantity, not just total quantity
+                if (qty > activeRental.getRemainingQty()) {
                     JOptionPane.showMessageDialog(this,
-                            "No active rental found for this equipment",
+                            "You only have " + activeRental.getRemainingQty() + " item(s) left to return.",
                             "Return Error",
                             JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 
-                if (qty > activeRental.getQuantity()) {
-                    JOptionPane.showMessageDialog(this,
-                            "Cannot return more than rented. You rented " + 
-                            activeRental.getQuantity() + " item(s).",
-                            "Return Error",
-                            JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
 
                 boolean success = rentalManager.returnEquipment(equipment, qty);
 
@@ -339,25 +338,39 @@ public class StudentFrame extends JFrame {
 
     private void refreshMyRentalsTable() {
         myRentalsTableModel.setRowCount(0);
-        
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         LocalDateTime now = LocalDateTime.now();
-         
         boolean foundOverdue = false;
 
         for (Rental r : rentalManager.getRentalHistory()) {
             if (r.getUserName().equals(student.getName())) {
                 
-                // 1. Determine Late Status
-                // Check if status is explicitly LATE or if the clock has passed the due date
-                boolean isLate = (r.getStatus().toString().equals("LATE") || now.isAfter(r.getDueDate())) 
-                                 && !r.getStatus().toString().equals("CLOSED");
-                
-                if (isLate) {
-                    foundOverdue = true;
+                // 1. Calculate Time Remaining
+                String timeLeft;
+                if (r.getStatus().toString().equals("CLOSED")) {
+                    timeLeft = "--";
+                } else {
+                	java.time.Duration duration = java.time.Duration.between(now, r.getDueDate());
+
+                	if (duration.isNegative()) {
+                	    timeLeft = "OVERDUE";
+                	} else {
+                	    long days = duration.toDays();
+                	    long hours = duration.toHoursPart();
+                	    long mins = duration.toMinutesPart();
+                	    long secs = duration.toSecondsPart(); // Gets the seconds within the minute
+
+                	    // Format: "1d 05h 10m 04s"
+                	    timeLeft = String.format("%dd %02dh %02dm %02ds", days, hours, mins, secs);
+                	}
                 }
 
-                // 2. Prepare Row Data
+                // 2. Determine Late Status
+                boolean isLate = (r.getStatus().toString().equals("LATE") || now.isAfter(r.getDueDate())) 
+                                 && !r.getStatus().toString().equals("CLOSED");
+                if (isLate) foundOverdue = true;
+
+                // 3. Prepare Row Data
                 Equipment equipment = equipmentManager.findByBarcode(r.getEquipmentBarcode());
                 String category = (equipment != null) ? equipment.getCategory() : "N/A";
                 
@@ -366,14 +379,16 @@ public class StudentFrame extends JFrame {
                         r.getEquipmentName(),
                         category,
                         r.getQuantity(),
+                        r.getRemainingQty(),
                         r.getRentalDate().format(formatter),
                         r.getDueDate().format(formatter),
-                        r.getStatus().toString()
+                        timeLeft,  
+                        r.getStatus().toString(),
                 });
             }
         }
 
-        // 3. Update the UI State
+        // Update the UI State
         itemOverdue = foundOverdue;
         
         // Only trigger layout changes if the visibility actually needs to flip

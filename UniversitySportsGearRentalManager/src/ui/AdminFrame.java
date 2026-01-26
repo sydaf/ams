@@ -9,7 +9,10 @@ import model.User;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Set;
+import java.util.TreeSet;
 
 /*
  * AdminFrame
@@ -52,6 +55,12 @@ public class AdminFrame extends JFrame {
         tabs.add("History / Audit", createHistoryPanel());
 
         add(tabs, BorderLayout.CENTER);
+    } 
+    
+    private void initAutoRefresh() {
+        // 60,000 milliseconds = 1 minute
+        Timer timer = new Timer(1000, e -> refreshHistoryTable());
+        timer.start();
     }
 
     // ================= HEADER =================
@@ -121,15 +130,22 @@ public class AdminFrame extends JFrame {
         try (java.io.PrintWriter pw =
                      new java.io.PrintWriter(chooser.getSelectedFile())) {
 
-            pw.println("User,Equipment,Quantity,Rental Date,Due Date,Status");
+            pw.println("Barcode (ID),Name,Category,Qty,Pending Qty,Rented Date,Return Date,Renter,Status");
 
             for (Rental r : rentalManager.getRentalHistory()) {
+
+                Equipment equipment = equipmentManager.findByBarcode(r.getEquipmentBarcode());
+                String category = (equipment != null) ? equipment.getCategory() : "N/A";
+                
                 pw.println(
-                        r.getUserName() + "," +
+                        r.getEquipmentBarcode() + "," +
                         r.getEquipmentName() + "," +
+                        category + "," +
                         r.getQuantity() + "," +
+                        r.getRemainingQty() + "," +
                         r.getRentalDate().format(formatter) + "," +
                         r.getDueDate().format(formatter) + "," +
+                        r.getUserName() + "," +
                         r.getStatus()
                 );
             }
@@ -192,7 +208,8 @@ public class AdminFrame extends JFrame {
         panel.add(filterPanel, BorderLayout.NORTH);
         cbCategoryFilter.addActionListener(e -> applyCategoryFilter());
 
-        String[] cols = {"Barcode", "Name", "Category", "Available", "Total", "Status"};
+        String[] cols = {"Barcode (ID)", "Name", "Category", "Availability"};
+
         equipmentTableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -404,37 +421,52 @@ public class AdminFrame extends JFrame {
     }
 
     private void applyHistoryCategoryFilter() {
-
         Object selected = cbHistoryCategoryFilter.getSelectedItem();
 
-        // 🔹 Prevent NullPointerException
+        // Prevent NullPointerException
         if (selected == null) return;
 
         String selectedCategory = selected.toString();
-
         historyTableModel.setRowCount(0);
 
-        DateTimeFormatter fmt =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        LocalDateTime now = LocalDateTime.now();
 
         for (Rental r : rentalManager.getRentalHistory()) {
-
-            Equipment eq = equipmentManager.findByBarcode(
-                    r.getEquipmentBarcode()
-            );
-
+            Equipment eq = equipmentManager.findByBarcode(r.getEquipmentBarcode());
             if (eq == null) continue;
 
-            if (selectedCategory.equals("All Categories") ||
-                eq.getCategory().equals(selectedCategory)) {
+            // Same filter logic
+            if (selectedCategory.equals("All Categories") || eq.getCategory().equals(selectedCategory)) {
+                
+                // Calculate timeLeft logic
+                String timeLeft;
+                if (r.getStatus().toString().equals("CLOSED")) {
+                    timeLeft = "--";
+                } else {
+                    java.time.Duration duration = java.time.Duration.between(now, r.getDueDate());
 
+                    if (duration.isNegative()) {
+                        timeLeft = "OVERDUE";
+                    } else {
+                        long days = duration.toDays();
+                        long hours = duration.toHoursPart();
+                        long mins = duration.toMinutesPart();
+                        long secs = duration.toSecondsPart();
+                        timeLeft = String.format("%dd %02dh %02dm %02ds", days, hours, mins, secs);
+                    }
+                }
+
+                // Add row with all 7 columns in the correct order
                 historyTableModel.addRow(new Object[]{
-                        r.getUserName(),
-                        r.getEquipmentName(),
-                        r.getQuantity(),
-                        r.getRentalDate().format(fmt),
-                        r.getDueDate().format(fmt),
-                        r.getStatus().name()
+                        r.getEquipmentBarcode(),           
+                        r.getEquipmentName(),       
+                        r.getQuantity(),            
+                        r.getRentalDate().format(fmt),  
+                        r.getDueDate().format(fmt),   
+                        r.getUserName(),      
+                        timeLeft,                   
+                        r.getStatus().name()        
                 });
             }
         }
@@ -459,18 +491,24 @@ public class AdminFrame extends JFrame {
         panel.add(filterPanel, BorderLayout.NORTH);
 
         // TABLE
-        String[] cols = {"User", "Equipment", "Qty", "Rental Date", "Due Date", "Status"};
-        historyTableModel = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
+     // Define the headers clearly
+        String[] cols = {"Barcode (ID)", "Name", "Category", "Qty", "Pending Qty", "Rented Date", "Return Date", "Renter", "Due In", "Status"};      
 
+        // Initialize the model with these columns
+        historyTableModel = new DefaultTableModel(cols, 0);
+
+        // Initialize the table WITH the model
         JTable table = new JTable(historyTableModel);
-	    RentalStatusRenderer renderer = new RentalStatusRenderer(); 
-	    table.getColumnModel().getColumn(5).setCellRenderer(renderer);
+
+        // IMPORTANT: Tell the table to automatically create columns from the model
+        table.setAutoCreateColumnsFromModel(true);
+
+        RentalStatusRenderer myRenderer = new RentalStatusRenderer();
+	     // Apply to the whole table so colors look consistent across the row
+	     table.setDefaultRenderer(Object.class, myRenderer);
 	     
         refreshHistoryTable();
-    	 
-	     javax.swing.Timer autoRefreshTimer = new javax.swing.Timer(20000, e -> {
+	     javax.swing.Timer autoRefreshTimer = new javax.swing.Timer(1000, e -> {
 	    	 refreshHistoryTable();
 	     });
 	     autoRefreshTimer.start(); 
@@ -533,56 +571,73 @@ public class AdminFrame extends JFrame {
         if (previousSelection != null) {
             cbCategoryFilter.setSelectedItem(previousSelection);
         }
-    }
-
+    } 
 
 
     private void refreshHistoryTable() {
+        // 1. Save what the user has currently selected
+        Object selectedItem = cbHistoryCategoryFilter.getSelectedItem();
 
-        Object previousSelection = cbHistoryCategoryFilter.getSelectedItem();
-
+        // 2. Clear the table rows ONLY
         historyTableModel.setRowCount(0);
-        cbHistoryCategoryFilter.removeAllItems();
-        cbHistoryCategoryFilter.addItem("All Categories");
 
-        DateTimeFormatter fmt =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        LocalDateTime now = LocalDateTime.now();
 
         for (Rental r : rentalManager.getRentalHistory()) {
-
-            Equipment eq = equipmentManager.findByBarcode(
-                    r.getEquipmentBarcode()
-            );
+            Equipment eq = equipmentManager.findByBarcode(r.getEquipmentBarcode());
             if (eq == null) continue;
 
-            // Add row
-            historyTableModel.addRow(new Object[]{
-                    r.getUserName(),
-                    r.getEquipmentName(),
-                    r.getQuantity(),
-                    r.getRentalDate().format(fmt),
-                    r.getDueDate().format(fmt),
-                    r.getStatus().name()
-            });
+            Equipment equipment = equipmentManager.findByBarcode(r.getEquipmentBarcode());
+            String category = (equipment != null) ? equipment.getCategory() : "N/A";
+            
+            // 3. Filter check: Only add rows that match the CURRENT selection
+            String selectedCategory = (selectedItem != null) ? selectedItem.toString() : "All Categories";
+            
+            if (selectedCategory.equals("All Categories") || eq.getCategory().equals(selectedCategory)) {
+                
+                // Calculate timeLeft
+                String timeLeft;
+                if (r.getStatus().toString().equals("CLOSED")) {
+                    timeLeft = "--";
+                } else {
+                    java.time.Duration duration = java.time.Duration.between(now, r.getDueDate());
+                    if (duration.isNegative()) {
+                        timeLeft = "OVERDUE";
+                    } else {
+                        timeLeft = String.format("%dd %02dh %02dm %02ds", 
+                            duration.toDays(), duration.toHoursPart(), 
+                            duration.toMinutesPart(), duration.toSecondsPart());
+                    }
+                }
 
-            // Populate filter dropdown
+                historyTableModel.addRow(new Object[]{
+                        r.getEquipmentBarcode(),
+                        r.getEquipmentName(), 
+                        category,
+                        r.getQuantity(),
+                        r.getRemainingQty(),
+                        r.getRentalDate().format(fmt),
+                        r.getDueDate().format(fmt),
+                        r.getUserName(),
+                        timeLeft,
+                        r.getStatus().name()
+                });
+            }
+
+            // 4. Update the dropdown list WITHOUT clearing it
+            // Only add the category if it's not already in the list
+            String cat = eq.getCategory();
             boolean exists = false;
             for (int i = 0; i < cbHistoryCategoryFilter.getItemCount(); i++) {
-                if (cbHistoryCategoryFilter.getItemAt(i)
-                        .equals(eq.getCategory())) {
+                if (cbHistoryCategoryFilter.getItemAt(i).equals(cat)) {
                     exists = true;
                     break;
                 }
             }
-
             if (!exists) {
-                cbHistoryCategoryFilter.addItem(eq.getCategory());
+                cbHistoryCategoryFilter.addItem(cat);
             }
-        }
-
-        // Restore selection
-        if (previousSelection != null) {
-            cbHistoryCategoryFilter.setSelectedItem(previousSelection);
         }
     }
 
